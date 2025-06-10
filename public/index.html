@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英語ボキャブラリー学習アプリ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            background: #333;
+            padding: 24px;
+            text-align: center;
+            color: white;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        .input-section label {
+            display: block;
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .text-input {
+            width: 100%;
+            min-height: 150px;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: #4facfe;
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+        }
+
+
+
+        .analyze-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .analyze-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .analyze-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #666;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            margin-top: 32px;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 32px;
+        }
+
+        .results h2 {
+            color: #333;
+            margin-bottom: 24px;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+
+        .vocabulary-item {
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .vocab-word {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .vocab-meaning {
+            color: #666;
+            margin-bottom: 12px;
+            line-height: 1.4;
+            font-size: 14px;
+        }
+
+        .vocab-example {
+            background: white;
+            padding: 12px;
+            border-left: 3px solid #666;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .download-btn {
+            background: #666;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 16px;
+            transition: background-color 0.2s ease;
+        }
+
+        .download-btn:hover {
+            background: #777;
+        }
+
+        .error {
+            background: #fff5f5;
+            color: #d32f2f;
+            padding: 12px;
+            border: 1px solid #ffcdd2;
+            border-left: 3px solid #d32f2f;
+            margin: 16px 0;
+            display: none;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>英語ボキャブラリー学習</h1>
+            <p>テキストから重要な語句を抽出して学習</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="input-section">
+                <label for="englishText">英語テキストを入力してください:</label>
+                <textarea id="englishText" class="text-input" placeholder="学習したい英語のテキストをここに入力してください..."></textarea>
+            </div>
+            
+            <div style="text-align: center;">
+                <button id="analyzeBtn" class="analyze-btn">語彙を分析する</button>
+            </div>
+            
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>テキストを分析中...</p>
+            </div>
+            
+            <div id="error" class="error"></div>
+            
+            <div id="results" class="results">
+                <h2>重要な語彙・フレーズ</h2>
+                <div id="vocabularyList"></div>
+                <div style="text-align: center;">
+                    <button id="downloadBtn" class="download-btn">Wordファイルをダウンロード</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentVocabulary = [];
+
+        document.getElementById('analyzeBtn').addEventListener('click', analyzeText);
+        document.getElementById('downloadBtn').addEventListener('click', downloadWord);
+
+        async function analyzeText() {
+            const text = document.getElementById('englishText').value.trim();
+            
+            if (!text) {
+                showError('英語テキストを入力してください。');
+                return;
+            }
+            
+            showLoading(true);
+            hideError();
+            hideResults();
+            
+            try {
+                const vocabulary = await extractVocabulary(text);
+                currentVocabulary = vocabulary;
+                displayResults(vocabulary);
+                showResults();
+            } catch (error) {
+                showError('エラーが発生しました: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function extractVocabulary(text) {
+            const prompt = `以下の英語テキストから、日本人の英語学習者にとって難しいと思われる語彙やフレーズを5個抽出し、以下のJSON形式で返してください。各項目に日本語での意味説明と英語の例文を含めてください。
+
+テキスト: "${text}"
+
+回答形式:
+{
+  "vocabulary": [
+    {
+      "word": "語彙またはフレーズ",
+      "meaning": "日本語での意味説明",
+      "example": "英語の例文"
+    }
+  ]
+}
+
+注意事項:
+- 中級レベル以上の語彙を選択してください
+- 意味説明は分かりやすく簡潔に
+- 例文は実用的で覚えやすいものにしてください
+- レスポンスは必ずJSON形式のみで返してください`;
+
+            const response = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text,
+                    prompt: prompt
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API request failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.vocabulary || [];
+        }
+
+        function displayResults(vocabulary) {
+            const listElement = document.getElementById('vocabularyList');
+            listElement.innerHTML = '';
+            
+            vocabulary.forEach((item, index) => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'vocabulary-item';
+                itemElement.innerHTML = `
+                    <div class="vocab-word">${index + 1}. ${item.word}</div>
+                    <div class="vocab-meaning">${item.meaning}</div>
+                    <div class="vocab-example">例文: ${item.example}</div>
+                `;
+                listElement.appendChild(itemElement);
+            });
+        }
+
+        function downloadWord() {
+            if (currentVocabulary.length === 0) {
+                showError('ダウンロードする語彙データがありません。');
+                return;
+            }
+
+            const today = new Date().toLocaleDateString('ja-JP');
+            let content = `今日の英語フレーズ (${today})\n\n`;
+            
+            currentVocabulary.forEach((item, index) => {
+                content += `${index + 1}. ${item.word}\n`;
+                content += `意味: ${item.meaning}\n`;
+                content += `例文: ${item.example}\n\n`;
+            });
+
+            // Word文書のXML構造を作成
+            const wordXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>
+<w:p>
+<w:pPr><w:pStyle w:val="Title"/></w:pPr>
+<w:r><w:t>今日の英語フレーズ (${today})</w:t></w:r>
+</w:p>
+${currentVocabulary.map((item, index) => `
+<w:p><w:r><w:t>${index + 1}. ${item.word}</w:t></w:r></w:p>
+<w:p><w:r><w:t>意味: ${item.meaning}</w:t></w:r></w:p>
+<w:p><w:r><w:t>例文: ${item.example}</w:t></w:r></w:p>
+<w:p><w:r><w:t></w:t></w:r></w:p>
+`).join('')}
+</w:body>
+</w:document>`;
+
+            // 簡易的なテキスト形式でダウンロード（Wordの完全な形式は複雑なため）
+            const blob = new Blob([content], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `今日の英語フレーズ_${today.replace(/\//g, '-')}.doc`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('analyzeBtn').disabled = show;
+        }
+
+        function showResults() {
+            document.getElementById('results').style.display = 'block';
+        }
+
+        function hideResults() {
+            document.getElementById('results').style.display = 'none';
+        }
+
+        function showError(message) {
+            const errorElement = document.getElementById('error');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
