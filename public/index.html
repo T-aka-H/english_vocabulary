@@ -80,27 +80,46 @@
             box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
         }
 
-
-
         .analyze-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #333;
             color: white;
             border: none;
             padding: 15px 40px;
             font-size: 1.1em;
             font-weight: 600;
-            border-radius: 50px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: background-color 0.3s ease;
+            margin-right: 10px;
         }
 
         .analyze-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            background: #555;
         }
 
         .analyze-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .additional-btn {
+            background: #666;
+            color: white;
+            border: 1px solid #888;
+            padding: 12px 30px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: none;
+            margin-left: 10px;
+        }
+
+        .additional-btn:hover:not(:disabled) {
+            background: #777;
+            border-color: #999;
+        }
+
+        .additional-btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
         }
@@ -133,6 +152,28 @@
             padding-top: 32px;
         }
 
+        .summary-section {
+            background: #f8f9ff;
+            border: 1px solid #e6e6ff;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+        }
+
+        .summary-section h3 {
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .summary-text {
+            color: #555;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
         .results h2 {
             color: #333;
             margin-bottom: 24px;
@@ -145,6 +186,12 @@
             border: 1px solid #e0e0e0;
             padding: 16px;
             margin-bottom: 12px;
+            position: relative;
+        }
+
+        .vocabulary-item.additional {
+            background: #f5f5f5;
+            border-left: 4px solid #666;
         }
 
         .vocab-word {
@@ -169,6 +216,18 @@
             color: #555;
         }
 
+        .vocab-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #666;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
         .download-btn {
             background: #666;
             color: white;
@@ -178,6 +237,7 @@
             font-weight: 500;
             cursor: pointer;
             margin-top: 16px;
+            margin-right: 10px;
             transition: background-color 0.2s ease;
         }
 
@@ -208,6 +268,12 @@
             .header h1 {
                 font-size: 1.5em;
             }
+
+            .analyze-btn, .additional-btn {
+                display: block;
+                margin: 10px 0;
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -226,6 +292,7 @@
             
             <div style="text-align: center;">
                 <button id="analyzeBtn" class="analyze-btn">語彙を分析する</button>
+                <button id="additionalBtn" class="additional-btn">他の語句・フレーズを解説する</button>
             </div>
             
             <div id="loading" class="loading">
@@ -236,6 +303,11 @@
             <div id="error" class="error"></div>
             
             <div id="results" class="results">
+                <div id="summarySection" class="summary-section">
+                    <h3>📋 テキストの要約</h3>
+                    <div id="summaryText" class="summary-text"></div>
+                </div>
+                
                 <h2>重要な語彙・フレーズ</h2>
                 <div id="vocabularyList"></div>
                 <div style="text-align: center;">
@@ -247,8 +319,12 @@
 
     <script>
         let currentVocabulary = [];
+        let additionalVocabulary = [];
+        let currentSummary = '';
+        let originalText = '';
 
         document.getElementById('analyzeBtn').addEventListener('click', analyzeText);
+        document.getElementById('additionalBtn').addEventListener('click', analyzeAdditional);
         document.getElementById('downloadBtn').addEventListener('click', downloadWord);
 
         async function analyzeText() {
@@ -259,15 +335,43 @@
                 return;
             }
             
+            originalText = text;
             showLoading(true);
             hideError();
             hideResults();
             
             try {
-                const vocabulary = await extractVocabulary(text);
-                currentVocabulary = vocabulary;
-                displayResults(vocabulary);
+                const result = await extractVocabulary(text);
+                currentVocabulary = result.vocabulary;
+                currentSummary = result.summary;
+                additionalVocabulary = []; // リセット
+                
+                displaySummary(currentSummary);
+                displayResults([...currentVocabulary]);
                 showResults();
+                showAdditionalButton();
+            } catch (error) {
+                showError('エラーが発生しました: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function analyzeAdditional() {
+            if (!originalText) {
+                showError('最初にテキストを分析してください。');
+                return;
+            }
+            
+            showLoading(true);
+            hideError();
+            
+            try {
+                const excludeWords = [...currentVocabulary, ...additionalVocabulary].map(item => item.word);
+                const newVocabulary = await extractAdditionalVocabulary(originalText, excludeWords);
+                additionalVocabulary = [...additionalVocabulary, ...newVocabulary];
+                
+                displayResults([...currentVocabulary, ...additionalVocabulary]);
             } catch (error) {
                 showError('エラーが発生しました: ' + error.message);
             } finally {
@@ -276,12 +380,16 @@
         }
 
         async function extractVocabulary(text) {
-            const prompt = `以下の英語テキストから、日本人の英語学習者にとって難しいと思われる語彙やフレーズを5個抽出し、以下のJSON形式で返してください。各項目に日本語での意味説明と英語の例文を含めてください。
+            const prompt = `以下の英語テキストを分析して、以下のJSON形式で返してください：
+
+1. テキストの要約を日本語で作成（100-150文字程度）
+2. 日本人の英語学習者にとって難しいと思われる語彙やフレーズを5個抽出
 
 テキスト: "${text}"
 
 回答形式:
 {
+  "summary": "テキストの日本語要約",
   "vocabulary": [
     {
       "word": "語彙またはフレーズ",
@@ -313,7 +421,59 @@
             }
 
             const data = await response.json();
+            return {
+                vocabulary: data.vocabulary || [],
+                summary: data.summary || ''
+            };
+        }
+
+        async function extractAdditionalVocabulary(text, excludeWords) {
+            const prompt = `以下の英語テキストから、既に抽出された語彙以外で、日本人の英語学習者にとって難しいと思われる語彙やフレーズを5個追加で抽出してください。
+
+テキスト: "${text}"
+
+除外する語彙（既に抽出済み）: ${excludeWords.join(', ')}
+
+回答形式:
+{
+  "vocabulary": [
+    {
+      "word": "語彙またはフレーズ",
+      "meaning": "日本語での意味説明",
+      "example": "英語の例文"
+    }
+  ]
+}
+
+注意事項:
+- 既に抽出された語彙は含めないでください
+- 中級レベル以上の語彙を選択してください
+- 意味説明は分かりやすく簡潔に
+- 例文は実用的で覚えやすいものにしてください
+- レスポンスは必ずJSON形式のみで返してください`;
+
+            const response = await fetch('/api/analyze-additional', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text,
+                    excludeWords: excludeWords,
+                    prompt: prompt
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API request failed: ${response.status}`);
+            }
+
+            const data = await response.json();
             return data.vocabulary || [];
+        }
+
+        function displaySummary(summary) {
+            document.getElementById('summaryText').textContent = summary;
         }
 
         function displayResults(vocabulary) {
@@ -322,18 +482,22 @@
             
             vocabulary.forEach((item, index) => {
                 const itemElement = document.createElement('div');
-                itemElement.className = 'vocabulary-item';
+                const isAdditional = index >= currentVocabulary.length;
+                itemElement.className = `vocabulary-item ${isAdditional ? 'additional' : ''}`;
+                
                 itemElement.innerHTML = `
                     <div class="vocab-word">${index + 1}. ${item.word}</div>
                     <div class="vocab-meaning">${item.meaning}</div>
                     <div class="vocab-example">例文: ${item.example}</div>
+                    ${isAdditional ? '<div class="vocab-badge">追加</div>' : ''}
                 `;
                 listElement.appendChild(itemElement);
             });
         }
 
         function downloadWord() {
-            if (currentVocabulary.length === 0) {
+            const allVocabulary = [...currentVocabulary, ...additionalVocabulary];
+            if (allVocabulary.length === 0) {
                 showError('ダウンロードする語彙データがありません。');
                 return;
             }
@@ -341,30 +505,46 @@
             const today = new Date().toLocaleDateString('ja-JP');
             let content = `今日の英語フレーズ (${today})\n\n`;
             
-            currentVocabulary.forEach((item, index) => {
-                content += `${index + 1}. ${item.word}\n`;
-                content += `意味: ${item.meaning}\n`;
-                content += `例文: ${item.example}\n\n`;
-            });
+            // 元の英文を追加
+            if (originalText) {
+                content += `📄 元の英文\n`;
+                content += `${'-'.repeat(30)}\n`;
+                content += `${originalText}\n\n`;
+                content += `${'='.repeat(50)}\n\n`;
+            }
+            
+            // サマリーを追加
+            if (currentSummary) {
+                content += `📋 テキストの要約\n`;
+                content += `${'-'.repeat(30)}\n`;
+                content += `${currentSummary}\n\n`;
+                content += `${'='.repeat(50)}\n\n`;
+            }
+            
+            // 元の語彙
+            if (currentVocabulary.length > 0) {
+                content += `📚 重要な語彙・フレーズ（初回分析）\n`;
+                content += `${'-'.repeat(30)}\n`;
+                currentVocabulary.forEach((item, index) => {
+                    content += `${index + 1}. ${item.word}\n`;
+                    content += `意味: ${item.meaning}\n`;
+                    content += `例文: ${item.example}\n\n`;
+                });
+            }
+            
+            // 追加の語彙
+            if (additionalVocabulary.length > 0) {
+                content += `${'='.repeat(50)}\n\n`;
+                content += `📖 追加の語彙・フレーズ\n`;
+                content += `${'-'.repeat(30)}\n`;
+                additionalVocabulary.forEach((item, index) => {
+                    content += `${currentVocabulary.length + index + 1}. ${item.word}\n`;
+                    content += `意味: ${item.meaning}\n`;
+                    content += `例文: ${item.example}\n\n`;
+                });
+            }
 
-            // Word文書のXML構造を作成
-            const wordXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:body>
-<w:p>
-<w:pPr><w:pStyle w:val="Title"/></w:pPr>
-<w:r><w:t>今日の英語フレーズ (${today})</w:t></w:r>
-</w:p>
-${currentVocabulary.map((item, index) => `
-<w:p><w:r><w:t>${index + 1}. ${item.word}</w:t></w:r></w:p>
-<w:p><w:r><w:t>意味: ${item.meaning}</w:t></w:r></w:p>
-<w:p><w:r><w:t>例文: ${item.example}</w:t></w:r></w:p>
-<w:p><w:r><w:t></w:t></w:r></w:p>
-`).join('')}
-</w:body>
-</w:document>`;
-
-            // 簡易的なテキスト形式でダウンロード（Wordの完全な形式は複雑なため）
+            // ダウンロード
             const blob = new Blob([content], { type: 'application/msword' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -379,6 +559,7 @@ ${currentVocabulary.map((item, index) => `
         function showLoading(show) {
             document.getElementById('loading').style.display = show ? 'block' : 'none';
             document.getElementById('analyzeBtn').disabled = show;
+            document.getElementById('additionalBtn').disabled = show;
         }
 
         function showResults() {
@@ -387,6 +568,15 @@ ${currentVocabulary.map((item, index) => `
 
         function hideResults() {
             document.getElementById('results').style.display = 'none';
+            hideAdditionalButton();
+        }
+
+        function showAdditionalButton() {
+            document.getElementById('additionalBtn').style.display = 'inline-block';
+        }
+
+        function hideAdditionalButton() {
+            document.getElementById('additionalBtn').style.display = 'none';
         }
 
         function showError(message) {
